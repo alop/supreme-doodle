@@ -1,0 +1,210 @@
+---
+- name: Create Infra
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Set ssh key
+      ec2_key:
+        name: rsa_ssh_key
+        key_material: "{{ ssh_key }}"
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+
+    - name: Determine available VPCs
+      ec2_vpc_net_info:
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+        filters:
+          "isDefault": "true"
+      register: default_vpc_list
+
+    - debug: var=default_vpc_list
+
+    - name: Set default vpc id
+      set_fact:
+        default_vpc: "{{ default_vpc_list.vpcs[0].id }}"
+
+    - debug: var=default_vpc
+
+    - name: Determine default subnet
+      ec2_vpc_subnet_info:
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+        filters:
+          vpc-id: "{{ default_vpc }}"
+      register: default_subnet
+
+    - debug: var=default_subnet
+
+    - name: Create VPC for infra
+      ec2_vpc_net:
+        name: Infra_VPC
+        cidr_block: 10.10.0.0/16
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+      register: infra_vpc
+
+    - name: Create Subnet for web
+      ec2_vpc_subnet:
+        vpc_id: "{{ infra_vpc.vpc.id }}"
+        cidr: 10.10.1.0/24
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+        map_public: true
+      register: web_subnet
+
+    - name: Create Subnet for app
+      ec2_vpc_subnet:
+        vpc_id: "{{ infra_vpc.vpc.id }}"
+        cidr: 10.10.2.0/24
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+      register: app_subnet
+
+    - name: Provision security groups for bastion
+      ec2_group:
+        name: bastion-sec
+        description: "Security group for bastion"
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+        vpc_id: "{{ default_vpc }}"
+        rules:
+          - proto: tcp
+            ports: 22
+            cidr_ip:
+              - 71.84.88.188/32
+              - 128.107.0.0/16
+        rules_egress:
+          - proto: -1
+            from_port: 0
+            to_port: 0
+            cidr_ip: 0.0.0.0/0
+
+    - name: Provision security group for web
+      ec2_group:
+        name: web-sec
+        description: "Security group for web hosts"
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+        vpc_id: "{{ infra_vpc.vpc.id }}"
+        rules:
+          - proto: tcp
+            ports:
+              - 80
+              - 443
+            cidr_ip: 0.0.0.0/0
+        rules_egress:
+          - proto: -1
+            from_port: 0
+            to_port: 0
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            ports: 80
+            cidr_ip: 10.10.2.0/24
+
+    - name: Provision security group for app
+      ec2_group:
+        name: app-sec
+        description: "Security group for app hosts"
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+        vpc_id: "{{ infra_vpc.vpc.id }}"
+        rules:
+          - proto: tcp
+            ports:
+              - 80
+            cidr_ip: 10.10.1.0/24
+        rules_egress:
+          - proto: -1
+            from_port: 0
+            to_port: 0
+            cidr_ip: 0.0.0.0/0
+
+    - name: Provision Bastion VM
+      ec2:
+        key_name: rsa_ssh_key
+        instance_type: "{{ vm_type }}"
+        image: "{{ vm_ami }}"
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+        instance_tags:
+          Name: bastion
+        assign_public_ip: yes
+        vpc_subnet_id: "{{ default_subnet.subnets[0].id }}"
+        group: bastion-sec
+        wait: true
+      register: ec2_instance
+
+    - debug: var=ec2_instance
+
+    - name: Add to host group
+      add_host:
+        hostname: "{{ item.public_ip }}"
+        groupname: ec2_hosts
+      loop: "{{ ec2_instance.instances }}"
+
+    - name: Provision Web VM
+      ec2:
+        key_name: rsa_ssh_key
+        instance_type: "{{ vm_type }}"
+        image: "{{ vm_ami }}"
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+        instance_tags:
+          Name: web
+        vpc_subnet_id: "{{ web_subnet.subnet.id }}"
+        assign_public_ip: true
+        wait: true
+        group: web-sec
+      register: ec2_instance
+
+    - name: Add to host group
+      add_host:
+        hostname: "{{ item.public_ip }}"
+        groupname: ec2_hosts
+      loop: "{{ ec2_instance.instances }}"
+
+    - name: Provision App VM
+      ec2:
+        key_name: rsa_ssh_key
+        instance_type: "{{ vm_type }}"
+        image: "{{ vm_ami }}"
+        region: "{{ region }}"
+        aws_access_key: "{{ ec2_access_key }}"
+        aws_secret_key: "{{ ec2_secret_key }}"
+        instance_tags:
+          Name: app
+        vpc_subnet_id: "{{ app_subnet.subnet.id }}"
+        assign_public_ip: yes
+        group: app-sec
+      register: ec2_instance
+
+    - name: Add to host group
+      add_host:
+        hostname: "{{ item.public_ip }}"
+        groupname: ec2_hosts
+      loop: "{{ ec2_instance.instances }}"
+
+- name: Configure VMs
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Install packages
+      package:
+        name: "{{ item }}"
+      with_items:
+        - nginx
+        - curl
