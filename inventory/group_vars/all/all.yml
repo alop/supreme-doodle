@@ -2,7 +2,6 @@
 # Free Tier Ubuntu 18.04 - x86_64
 ssh_user: ubuntu
 ssh_port: 22
-ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC3d9DCWMGE0Lv0CFIPMRiasjoLNn/GCszTIvPPwI4OeEcGbGizjzS6omHoKfm1NX3pMPl7WF4dFmnCwWYtXUdyNUMt2P1Hpnzr2Ko6HI39NRcdohQKzSrELAu6mRG5Ypa9Ql8W0igdyaAnsuwHPR2T7qf/C090+FJdOwJ+KgmmIl1y88wJCBqGxPqVndp+XiGasUbUfhVQZ8emuTOxQnB/K6ZQc7GHAj7MvGiImt+51m0JxPwgHSow1/8BY0pZio+bTmgfy+lM1b/VM7SU7jFTAFGEO8/tR6+sFZkwhBSshyx52I5YBptb17A3dCIv5JaGe55qqHcOB8U+gmFp+sntZlGI2c9rXkcruJ+U/GsWYiZnB0qwCziBUUT2Kf4nyk1WZxLw/9dG5ZIbG75hpR/+UBJyfXE15OqMSMiSTW+RU/w3tbWu5Q8WH6eI4iIDaCDcFmMalJs6eMQQwqD0hR4G+yUdIKdI5DInHyGJsGzuCIkkId7D9GFySSBLk/+8rD0= abelopez@ABELOPEZ-M-JPN0
 vm_ami: ami-0a63f96e85105c6d3
 vm_type: t2.micro
 region: us-east-2

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to the app server instance</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to the app server, instance: {{ app_instance.instances[0].instance_id }} !</h1>
+
+<p>This page is being proxied via the web front-end</p>
+
+</body>
+</html>

@@ -1,8 +1,15 @@
 ---
-group_name: web
-web_sec_rules:
-  - proto: tcp
-    ports:
-      - 80
-      - 443
-    cidr_ip: 0.0.0.0/0
+nginx_vhosts:
+  - listen: "80"
+    server_name: "{{ web_external_dns }}"
+    return: "301 https://{{ web_external_dns }}$request_uri"
+    filename: "web-frontend.80.conf"
+  - listen: "443 ssl"
+    server_name: "{{ web_external_dns }}"
+    extra_parameters: |
+      include snippets/snakeoil.conf;
+      location / {
+        proxy_pass http://{{ app_internal_ip}};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+      }
