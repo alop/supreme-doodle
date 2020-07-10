@@ -36,3 +36,15 @@ After the deploy complete, access information is printed on the terminal
 
     make clean
 
+# Areas for improvement/Follow-up questions
+* How to make fault tolerant and H/A?
+	
+	This deployment could be more fault tolerant by splaying the resources into different AZs in the region, or moreso by deploying to different regions. The modules used support these features, and could be configured as such if desired. Additionally, ansible has modules to create elastic load-balancers.
+	
+* How to make this deployment more secure?
+
+	There are various system-administration practices that can be applied to cloud instances. Obviously, the use of an ACME (Let's Encrypt) system would be step 1 in a real production deployment. Periodic replacement of the instances when newer images are available would ensure that we're not running with known vulnerabilities.
+	
+* How to keep up with changing demands?
+
+	The deployment language (ansible) supports the creation of auto-scaling groups (ASG), which can be configured with launch configs.		
