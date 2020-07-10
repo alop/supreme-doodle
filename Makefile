@@ -28,6 +28,8 @@ clean: guard-AWS_SECRET_KEY guard-AWS_ACCESS_KEY_ID guard-AWS_REGION
 
 .PHONY: prep
 prep: .venv
+	git submodule init
+	git submodule update
 ifeq ($(SSH_KEY_EXISTS),0)
 	ssh-keygen -t rsa -N "" -C "Demo key" -f demo_key
 endif
