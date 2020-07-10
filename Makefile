@@ -21,8 +21,7 @@ guard-%:
 
 .PHONY: clean
 clean: guard-AWS_SECRET_KEY guard-AWS_ACCESS_KEY_ID guard-AWS_REGION
-	$(VENV_ACTIVATE)
-	ansible-playbook -i inventory/ playbooks/remove_infra.yml
+	$(VENV_ACTIVATE) && ansible-playbook -i inventory/ playbooks/remove_infra.yml
 	$(RM) -rf $(VENV_NAME)
 	$(RM) demo_key*
 
