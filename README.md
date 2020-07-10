@@ -29,6 +29,9 @@ Certain versions of boto3 have an issue with newlines in the AWS_ environment va
     make prep
     make deploy
 
+## How to access resources
+After the deploy complete, access information is printed on the terminal
+
 ## Removal of resources created
 
     make clean
