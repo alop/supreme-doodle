@@ -36,5 +36,4 @@ endif
 
 .PHONY: deploy
 deploy: guard-AWS_SECRET_KEY guard-AWS_ACCESS_KEY_ID guard-AWS_REGION
-	$(VENV_ACTIVATE)
-	ansible-playbook --private-key demo_key -i inventory/ playbooks/deploy_infra.yml
+	$(VENV_ACTIVATE) && ansible-playbook --private-key demo_key -i inventory/ playbooks/deploy_infra.yml
