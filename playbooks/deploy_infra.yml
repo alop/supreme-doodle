@@ -120,7 +120,7 @@
             cidr_ip: 0.0.0.0/0
           - proto: tcp
             ports: 22
-            group_id: "{{ bastion_sec_group.group_id }}"
+            cidr_ip: "{{ bastion_subnet.subnet.cidr_block }}"
         rules_egress:
           - proto: tcp
             ports: 80
@@ -137,10 +137,10 @@
         rules:
           - proto: tcp
             ports: 80
-            group_id: "{{ web_sec_group.group_id }}"
+            cidr_ip: "{{ web_subnet.subnet.cidr_block }}"
           - proto: tcp
             ports: 22
-            group_id: "{{ bastion_sec_group.group_id }}"
+            cidr_ip: "{{ bastion_subnet.subnet.cidr_block }}"
         rules_egress: []
       register: app_sec_group
 
@@ -156,6 +156,8 @@
         vpc_subnet_id: "{{ bastion_subnet.subnet.id }}"
         group: open-sec
         wait: true
+        exact_count: 1
+        count_tag: { Name: bastion }
       register: bastion_instance
 
     - name: Add to host group
@@ -176,6 +178,8 @@
         assign_public_ip: true
         wait: true
         group: open-sec
+        exact_count: 1
+        count_tag: { Name: web }
       register: web_instance
 
     - name: Add to host group
@@ -198,6 +202,8 @@
         assign_public_ip: true
         wait: true
         group: open-sec
+        exact_count: 1
+        count_tag: { Name: app }
       register: app_instance
 
     - name: Add to host group
@@ -217,8 +223,14 @@
         timeout: 320
       loop: "{{ app_instance.instances }}"
 
+    - name: Ensure all instances have correct security group (for subsequent runs)
+      ec2:
+        state: running
+        instance_tags: { demo: 'true' }
+        group: open-sec
+
 - name: Configure all VMs
-  hosts: ec2_hosts
+  hosts: all
   remote_user: ubuntu
   become: true
   gather_facts: true
@@ -236,9 +248,8 @@
     AWS_SECRET_KEY: "{{ lookup('env','AWS_SECRET_KEY') }}"
     AWS_ACCESS_KEY_ID: "{{ lookup('env','AWS_ACCESS_KEY_ID') }}"
     AWS_REGION: "{{ lookup('env','AWS_REGION') }}"
-  hosts: web
+  hosts: tag_web
   remote_user: ubuntu
-  become: true
   gather_facts: false
   pre_tasks:
     - name: Gather info about web instance
@@ -262,21 +273,22 @@
     - name: Configure SSL Certs
       package:
         name: ssl-cert
+      become: true
 
   roles:
     - role: geerlingguy.nginx
       nginx_remove_default_vhost: true
       web_external_dns: "{{ web_instance.instances[0].public_dns_name }}"
       app_internal_ip: "{{ app_instance.instances[0].private_ip_address }}"
+      become: true
 
 - name: Configure app VM(s)
   environment:
     AWS_SECRET_KEY: "{{ lookup('env','AWS_SECRET_KEY') }}"
     AWS_ACCESS_KEY_ID: "{{ lookup('env','AWS_ACCESS_KEY_ID') }}"
     AWS_REGION: "{{ lookup('env','AWS_REGION') }}"
-  hosts: app
+  hosts: tag_app
   remote_user: ubuntu
-  become: true
   gather_facts: false
   pre_tasks:
     - name: Gather info about app instance
@@ -292,28 +304,51 @@
       template:
         src: "{{ playbook_dir }}/../templates/index.html.j2"
         dest: /var/www/html/index.html
+      become: true
 
 - name: Finalize state
   hosts: localhost
   connection: local
   gather_facts: false
   tasks:
+    - name: Get info
+      ec2_instance_info:
+        filters:
+          "tag:demo": 'true'
+          "tag:Name": bastion
+      register: bastion_instance
+
+    - name: Get info
+      ec2_instance_info:
+        filters:
+          "tag:demo": 'true'
+          "tag:Name": app
+      register: app_instance
+
+    - name: Get info
+      ec2_instance_info:
+        filters:
+          "tag:demo": 'true'
+          "tag:Name": web
+      register: web_instance
+
+
     - name: Set final security groups
       ec2:
         state: running
-        instance_id: "{{ bastion_instance.instance_ids }}"
+        instance_tags: { Name: bastion }
         group: bastion-sec
 
     - name: Set final security groups
       ec2:
         state: running
-        instance_id: "{{ app_instance.instance_ids }}"
+        instance_tags: { Name: app }
         group: app-sec
 
     - name: Set final security groups
       ec2:
         state: running
-        instance_id: "{{ web_instance.instance_ids }}"
+        instance_tags: { Name: web }
         group: web-sec
 
     - debug:
@@ -321,4 +356,4 @@
           - "Deployment complete."
           - "SSH bastion host: ssh -A -i demo_key ubuntu@{{ bastion_instance.instances[0].public_dns_name }} "
           - "Web front-end (self-signed SSL redirect): http://{{ web_instance.instances[0].public_dns_name }} "
-          - "Backend App (Via Bastion): {{ app_instance.instances[0].private_ip }}"
+          - "Backend App (Via Bastion): {{ app_instance.instances[0].private_ip_address }}"
